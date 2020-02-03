@@ -39,7 +39,7 @@ RESPONSE *GetResponse(REQUEST *request)
 int SendResponse(SOCKET sock, RESPONSE *response)
 {
     if (response->error) {
-        send(sock, DEFAULT_ERROR_404, strlen(DEFAULT_ERROR_404), 0);
+        send(sock, DEFAULT_ERROR_404, (int)strlen(DEFAULT_ERROR_404), 0);
         return 1;
     }
 
@@ -52,10 +52,10 @@ int SendResponse(SOCKET sock, RESPONSE *response)
         return 1;
     }
 
-    send(sock, response->header, strlen(response->header), 0);
+    send(sock, response->header, (int)strlen(response->header), 0);
 
     int result = 0;
-    while ((result = fread(buf, 1, 1024, f)) > 0)
+    while ((result = (int)fread(buf, 1, 1024, f)) > 0)
     {
         msg_len = send(sock, buf, result, 0);
 

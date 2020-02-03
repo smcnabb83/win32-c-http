@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include "server.h"
 
+#define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
+
 int get_request_type(char *buf)
 {
     char retval[10] = {0};
@@ -29,6 +31,37 @@ char *get_request_value(char *buf)
     return strdup(retval);
 }
 
+char* get_request_cookie(char *buf, int len)
+{
+    //TODO: Very inefficient - make this run better
+    char* bufpos = buf;
+    char *result = malloc(200);
+    char *returnResult = malloc(200);
+    *returnResult = "";
+    for(int i = 0; i < len; i++){
+
+        int res = sscanf(bufpos, "%s", result);
+        if(res == EOF){
+            return 0;
+        }
+        printf("cookie comp at: %s\n", result);
+        if(strcmp(result, "Cookie:") == 0){
+            printf("buffer position: %s\n\n", bufpos);
+            sscanf(bufpos, "%s %s", result, returnResult);
+            break;
+        }
+        bufpos++;
+    }
+    free(result);
+    return returnResult;
+}
+
+void FreeRequest(REQUEST* req){
+    free(req->cookie);
+    free(req->value);
+    free(req);
+}
+
 REQUEST *GetRequest(SOCKET sock)
 {
     REQUEST *request;
@@ -36,12 +69,15 @@ REQUEST *GetRequest(SOCKET sock)
     char buf[REQUEST_SIZE];
 
     msg_len = recv(sock, buf, sizeof(buf), 0);
-    //printf("Bytes Received: %d, message: %s from %s\n", msg_len, buf, inet_ntoa(client.sin_addr));
+    char* cookie = get_request_cookie(buf, msg_len);
+    printf("Bytes Received: %d, message: %s\n", msg_len, buf);
+    printf("Request cookie %s", cookie);
 
     request         = malloc(sizeof(REQUEST));
     request->type   = get_request_type(buf);
     request->value  = get_request_value(buf);
     request->length = msg_len;
+    request->cookie = cookie;
 
     return request;
 }

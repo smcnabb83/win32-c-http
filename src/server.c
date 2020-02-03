@@ -51,13 +51,16 @@ listen_goto:
         REQUEST *request = GetRequest(msg_sock);
         printf("Client requested %d %s\n", request->type, request->value);
 
-        if (request->length == 0)
+        if (request->length == 0){
+            FreeRequest(request);
             continue;
+        }
 
         RESPONSE *response = GetResponse(request);
         int sent = SendResponse(msg_sock, response);
 
         closesocket(msg_sock);
+        FreeRequest(request);
 
         if (sent == 0)
             break;
