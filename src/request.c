@@ -37,16 +37,17 @@ char* get_request_cookie(char *buf, int len)
     char* bufpos = buf;
     char *result = malloc(200);
     char *returnResult = malloc(200);
-    *returnResult = "";
+    returnResult = "";
     for(int i = 0; i < len; i++){
 
         int res = sscanf(bufpos, "%s", result);
         if(res == EOF){
             return 0;
         }
-        printf("cookie comp at: %s\n", result);
+        
+        //printf("cookie comp at: %s\n", result);
         if(strcmp(result, "Cookie:") == 0){
-            printf("buffer position: %s\n\n", bufpos);
+            //printf("buffer position: %s\n\n", bufpos);
             sscanf(bufpos, "%s %s", result, returnResult);
             break;
         }

@@ -3,7 +3,7 @@
 IF "%VSCMD_VER%" == "" (call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools\VsDevCmd.bat")
 
 set CommonCompilerFlags=-MTd -nologo -fp:fast -Gm- -GR- -EHa- -Od -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -wd4505 -wd4996 -FS
-set CommonLinkerFlags= -incremental:no -opt:ref -PDB:server.pdb user32.lib gdi32.lib winmm.lib ws2_32.lib
+set CommonLinkerFlags= -incremental:no -opt:ref -PDB:server.pdb -DEBUG:FULL user32.lib gdi32.lib winmm.lib ws2_32.lib
 
 IF NOT EXIST .\build mkdir .\build
 pushd .\build
@@ -14,6 +14,10 @@ popd
 xcopy *.html .\build\. /Y
 xcopy *.css .\build\. /Y
 xcopy *.png .\build\. /Y
+
+pushd .\src
+del *.o > NUL 2> NUL
+popd
 
 
 

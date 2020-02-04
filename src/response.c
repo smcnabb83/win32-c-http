@@ -78,3 +78,10 @@ int SendResponse(SOCKET sock, RESPONSE *response)
 
     return 1;
 }
+
+void FreeResponse(RESPONSE* resp){
+    free(resp->filename);
+    free(resp->filepath);
+    free(resp->header);
+    free(resp);
+}
