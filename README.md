@@ -15,7 +15,6 @@ Absolutely not.
 
 A lot, namely
 
-* Right now, the multiple threads just spin when there's no work, and since the program is designed to create 1 thread per core, it will most likely use 100% of your CPU
 * There is no real routing functionality right now
 * There are wonky debug printf statements everywhere
 * There's a lot of code that, while it kinda works, is not bulletproof enough for a production environment (my current implementation of a ring buffer leaves a lot to be desired).
