@@ -17,6 +17,7 @@ typedef struct
 
 SOCKET_INFO SocketsToProcess[MAX_SOCKETS];
 volatile long nextSocketToRead = 0;
+HANDLE RingBufferSemaphore;
 int nextSocketToWrite = 0;
 int resetListener = 0;
 int globalErrorCon = ERRCON_NONE;

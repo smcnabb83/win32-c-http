@@ -48,12 +48,21 @@ DWORD WINAPI processNextSocketInQueue(LPVOID args)
                 closesocket(SocketsToProcess[sockID].conn);
                 FreeRequest(request);
             }
+        } else {
+            WaitForSingleObjectEx(RingBufferSemaphore, INFINITE, FALSE);
         }
     }
 }
 
 int main(int argc, char **argv)
 {
+
+    SYSTEM_INFO info;
+    GetSystemInfo(&info);
+    int threadsToUse = ((int)info.dwNumberOfProcessors) - 1;
+
+    RingBufferSemaphore = CreateSemaphoreEx(NULL, 0, threadsToUse, NULL, 0, SEMAPHORE_ALL_ACCESS);
+
     int addr_len;
     struct sockaddr_in local, client_addr;
 
@@ -83,13 +92,7 @@ listen_goto:
 
     printf("Waiting for connection...\n");
 
-    SYSTEM_INFO info;
-    GetSystemInfo(&info);
-    int threadsToUse = ((int)info.dwNumberOfProcessors) - 1;
-    printf("Got System Info]n");
-
     HANDLE *threads = malloc(sizeof(HANDLE)*threadsToUse);
-    printf("Allocated thread memory space\n");
 
     HANDLE *currentThread = threads;
     //TODO: Do we really need bsArgumentToPass
@@ -108,7 +111,8 @@ listen_goto:
         SocketsToProcess[nextSocketToWrite].client_addr = client_addr;
         SocketsToProcess[nextSocketToWrite].address_length = addr_len;
         while((nextSocketToWrite + 1) % MAX_SOCKETS == nextSocketToRead); //spin until read cursor moves to the next
-        nextSocketToWrite = ((nextSocketToWrite + 1) % MAX_SOCKETS);        
+        nextSocketToWrite = ((nextSocketToWrite + 1) % MAX_SOCKETS);     
+        ReleaseSemaphore(RingBufferSemaphore, 1, 0);
 
         if (globalErrorCon == ERRCON_TERMINATE_SERVER)
             break;
