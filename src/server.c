@@ -3,6 +3,7 @@
 #include "ringbuf.h"
 DWORD WINAPI processNextSocketInQueue(LPVOID args)
 {
+    //TODO: Right now, we're spinning forever. Maybe we can clean this up so we're not spinning multiple threads forever. 
     forever
     {
         int sockID = nextSocketToRead;
@@ -60,9 +61,7 @@ int main(int argc, char **argv)
     WSADATA wsaData;
 
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) == SOCKET_ERROR)
-        error_die("WSAStartup()");
-
-    
+        error_die("WSAStartup()");    
 
     // Fill in the address structure
     local.sin_family        = AF_INET;
@@ -84,12 +83,22 @@ listen_goto:
 
     printf("Waiting for connection...\n");
 
-    int bsArgumentToPass = 0;
-    HANDLE unusedHandle = CreateThread(NULL, 0, processNextSocketInQueue, &bsArgumentToPass, 0, NULL );
-    HANDLE unusedHandle2 = CreateThread(NULL, 0, processNextSocketInQueue, &bsArgumentToPass, 0, NULL);
-    HANDLE unusedHandle3 = CreateThread(NULL, 0, processNextSocketInQueue, &bsArgumentToPass, 0, NULL);
-    HANDLE unusedHandle4 = CreateThread(NULL, 0, processNextSocketInQueue, &bsArgumentToPass, 0, NULL);
+    SYSTEM_INFO info;
+    GetSystemInfo(&info);
+    int threadsToUse = ((int)info.dwNumberOfProcessors) - 1;
+    printf("Got System Info]n");
 
+    HANDLE *threads = malloc(sizeof(HANDLE)*threadsToUse);
+    printf("Allocated thread memory space\n");
+
+    HANDLE *currentThread = threads;
+    //TODO: Do we really need bsArgumentToPass
+    int bsArgumentToPass = 0;
+    for(int i = 0; i < threadsToUse; i++){
+        printf("allocating thread %d of %d", i, threadsToUse);
+        *currentThread = CreateThread(NULL, 0, processNextSocketInQueue, &bsArgumentToPass, 0, NULL);
+        currentThread++;
+    }
     int count = 0;
 
     forever
