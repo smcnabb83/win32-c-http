@@ -43,9 +43,7 @@ char* get_request_cookie(char *buf, int len)
         if(res == EOF){
             return 0;
         }
-        printf("cookie comp at: %s\n", result);
         if(strcmp(result, "Cookie:") == 0){
-            printf("buffer position: %s\n\n", bufpos);
             sscanf(bufpos, "%s %s", result, returnResult);
             break;
         }
@@ -56,7 +54,7 @@ char* get_request_cookie(char *buf, int len)
 }
 
 void FreeRequest(REQUEST* req){
-    //free(req->cookie);
+    free(req->cookie);
     free(req->value);
     free(req);
 }
@@ -68,15 +66,15 @@ REQUEST *GetRequest(SOCKET sock)
     char buf[REQUEST_SIZE];
 
     msg_len = recv(sock, buf, sizeof(buf), 0);
-    //char* cookie = get_request_cookie(buf, msg_len);
+    char* cookie = get_request_cookie(buf, msg_len);
     printf("Bytes Received: %d, message: %s\n", msg_len, buf);
-    //printf("Request cookie %s", cookie);
+    printf("Request cookie %s", cookie);
 
     request         = malloc(sizeof(REQUEST));
     request->type   = get_request_type(buf);
     request->value  = get_request_value(buf);
     request->length = msg_len;
-    //request->cookie = cookie;
+    request->cookie = cookie;
 
     return request;
 }

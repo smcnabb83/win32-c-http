@@ -1,55 +1,58 @@
 
 #include "server.h"
 #include "ringbuf.h"
+#include "globals.h"
+
 DWORD WINAPI processNextSocketInQueue(LPVOID args)
 {
+    RING_BUFFER* ringBuffer = (RING_BUFFER *)args;
     //TODO: Right now, we're spinning forever. Maybe we can clean this up so we're not spinning multiple threads forever. 
     forever
     {
-        int sockID = nextSocketToRead;
-        if (sockID != nextSocketToWrite)
+        int sockID = ringBuffer->nextSocketToRead;
+        if (sockID != ringBuffer->nextSocketToWrite)
         {
-            if (sockID == InterlockedCompareExchange(&nextSocketToRead, ((sockID + 1) % MAX_SOCKETS), sockID))
+            if (sockID == InterlockedCompareExchange(&ringBuffer->nextSocketToRead, ((sockID + 1) % MAX_SOCKETS), sockID))
             {
-                if (SocketsToProcess[sockID].conn == INVALID_SOCKET || SocketsToProcess[sockID].conn == -1){
+                if (ringBuffer->SocketBuffer[sockID].conn == INVALID_SOCKET || ringBuffer->SocketBuffer[sockID].conn == -1){
                     //TODO: Log this as an error, but continue in case the socket being invalid was a 1 time thing
-                    printf("We have an invalid socket for some reason. SocketID: %d\n", sockID);
+                    DEBUGPRINT("We have an invalid socket for some reason. SocketID: %d\n", sockID);
                     continue;
                 }
 
-                printf("\n\n#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$\n\n");
-                printf("Connected to %s:%d\n", inet_ntoa(SocketsToProcess[sockID].client_addr.sin_addr), htons(SocketsToProcess[sockID].client_addr.sin_port));
+                DEBUGPRINT("\n\n#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$\n\n");
+                DEBUGPRINT("Connected to %s:%d\n", inet_ntoa(ringBuffer->SocketBuffer[sockID].client_addr.sin_addr), htons(ringBuffer->SocketBuffer[sockID].client_addr.sin_port));
 
-                REQUEST *request = GetRequest(SocketsToProcess[sockID].conn);
-                printf("Client requested %d %s\n", request->type, request->value);
+                REQUEST *request = GetRequest(ringBuffer->SocketBuffer[sockID].conn);
+                DEBUGPRINT("Client requested %d %s\n", request->type, request->value);
 
                 if (request->length == 0)
                 {
-                    printf("Request length 0\n");
+                    DEBUGPRINT("Request length 0\n");
                     FreeRequest(request);
 
                     continue;
                 }
 
                 RESPONSE *response = GetResponse(request);
-                int sent = SendResponse(SocketsToProcess[sockID].conn, response);
+                int sent = SendResponse(ringBuffer->SocketBuffer[sockID].conn, response);
 
-                printf("response sent\n");
+                DEBUGPRINT("response sent\n");
 
                 if (sent == 0)
                 {
-                    globalErrorCon = ERRCON_TERMINATE_SERVER;
+                    ringBuffer->bufferErrorCon = ERRCON_TERMINATE_SERVER;
                 }
                 else if (sent == -1)
                 {
-                    globalErrorCon = ERRCON_RESET_LISTENER;
+                    ringBuffer->bufferErrorCon = ERRCON_RESET_LISTENER;
                 }
 
-                closesocket(SocketsToProcess[sockID].conn);
+                closesocket(ringBuffer->SocketBuffer[sockID].conn);
                 FreeRequest(request);
             }
         } else {
-            WaitForSingleObjectEx(RingBufferSemaphore, INFINITE, FALSE);
+            WaitForSingleObjectEx(ringBuffer->RingBufferSemaphore, INFINITE, FALSE);
         }
     }
 }
@@ -61,7 +64,7 @@ int main(int argc, char **argv)
     GetSystemInfo(&info);
     int threadsToUse = ((int)info.dwNumberOfProcessors) - 1;
 
-    RingBufferSemaphore = CreateSemaphoreEx(NULL, 0, threadsToUse, NULL, 0, SEMAPHORE_ALL_ACCESS);
+    RING_BUFFER ringBuffer = GetNewRingBuffer(threadsToUse);
 
     int addr_len;
     struct sockaddr_in local, client_addr;
@@ -90,16 +93,18 @@ listen_goto:
     if (listen(sock, 5) == SOCKET_ERROR)
         error_die("listen()");
 
-    printf("Waiting for connection...\n");
+    DEBUGPRINT("Sockets to process currentl takes %ld bytes of memory\n", (long)sizeof(ringBuffer.SocketBuffer));
+
+    DEBUGPRINT("Waiting for connection...\n");
 
     HANDLE *threads = malloc(sizeof(HANDLE)*threadsToUse);
 
     HANDLE *currentThread = threads;
     //TODO: Do we really need bsArgumentToPass
-    int bsArgumentToPass = 0;
+    RING_BUFFER* ringBufferPointer = &ringBuffer;
     for(int i = 0; i < threadsToUse; i++){
-        printf("allocating thread %d of %d", i, threadsToUse);
-        *currentThread = CreateThread(NULL, 0, processNextSocketInQueue, &bsArgumentToPass, 0, NULL);
+        DEBUGPRINT("allocating thread %d of %d\n", i, threadsToUse);
+        *currentThread = CreateThread(NULL, 0, processNextSocketInQueue, &ringBuffer, 0, NULL);
         currentThread++;
     }
     int count = 0;
@@ -107,16 +112,17 @@ listen_goto:
     forever
     {
         addr_len = sizeof(client_addr);
-        SocketsToProcess[nextSocketToWrite].conn = accept(sock, (struct sockaddr*)&client_addr, &addr_len);
-        SocketsToProcess[nextSocketToWrite].client_addr = client_addr;
-        SocketsToProcess[nextSocketToWrite].address_length = addr_len;
-        while((nextSocketToWrite + 1) % MAX_SOCKETS == nextSocketToRead); //spin until read cursor moves to the next
-        nextSocketToWrite = ((nextSocketToWrite + 1) % MAX_SOCKETS);     
-        ReleaseSemaphore(RingBufferSemaphore, 1, 0);
+        ringBuffer.SocketBuffer[ringBuffer.nextSocketToWrite].conn = accept(sock, (struct sockaddr*)&client_addr, &addr_len);
+        ringBuffer.SocketBuffer[ringBuffer.nextSocketToWrite].client_addr = client_addr;
+        ringBuffer.SocketBuffer[ringBuffer.nextSocketToWrite].address_length = addr_len;
+        while ((ringBuffer.nextSocketToWrite + 1) % MAX_SOCKETS == ringBuffer.nextSocketToRead)
+            ; //spin until read cursor moves to the next
+        ringBuffer.nextSocketToWrite = ((ringBuffer.nextSocketToWrite + 1) % MAX_SOCKETS);
+        ReleaseSemaphore(ringBuffer.RingBufferSemaphore, 1, 0);
 
-        if (globalErrorCon == ERRCON_TERMINATE_SERVER)
+        if (ringBuffer.bufferErrorCon == ERRCON_TERMINATE_SERVER)
             break;
-        else if (globalErrorCon == ERRCON_RESET_LISTENER)
+        else if (ringBuffer.bufferErrorCon == ERRCON_RESET_LISTENER)
             goto listen_goto;
 
     }

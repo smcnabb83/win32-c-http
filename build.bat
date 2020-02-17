@@ -8,7 +8,7 @@ set CommonLinkerFlags= -incremental:no -opt:ref -PDB:server.pdb user32.lib gdi32
 IF NOT EXIST .\build mkdir .\build
 pushd .\build
 del *.pdb > NUL 2> NUL
-cl %CommonCompilerFlags% ..\src\server.c ..\src\request.c ..\src\response.c ..\src\header.c ..\src\error.c ..\src\defaults.c /link %CommonLinkerFlags%
+cl %CommonCompilerFlags% ..\src\server.c ..\src\request.c ..\src\response.c ..\src\header.c ..\src\error.c ..\src\defaults.c ..\src\ringbuf.c /link %CommonLinkerFlags%
 popd
 
 xcopy *.html .\build\. /Y
