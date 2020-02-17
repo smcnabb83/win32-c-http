@@ -63,18 +63,21 @@ int SendResponse(SOCKET sock, RESPONSE *response)
             //error_live("send()");
             printf("Error sending data, reconnecting...\n");
             closesocket(sock);
+            fclose(f);
             return -1;
         }
         else if (!msg_len)
         {
             printf("Client closed connection\n");
             closesocket(sock);
+            fclose(f);
             return 0;
             //WSACleanup();
         }
     }
 
     printf("Served file %s\n", response->filepath);
+    fclose(f);
 
     return 1;
 }

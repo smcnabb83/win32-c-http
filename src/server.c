@@ -1,19 +1,68 @@
-#include <winsock2.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+
 #include "server.h"
+#include "ringbuf.h"
+DWORD WINAPI processNextSocketInQueue(LPVOID args)
+{
+    forever
+    {
+        int sockID = nextSocketToRead;
+        if (sockID != nextSocketToWrite)
+        {
+            if (sockID == InterlockedCompareExchange(&nextSocketToRead, ((sockID + 1) % MAX_SOCKETS), sockID))
+            {
+                if (SocketsToProcess[sockID].conn == INVALID_SOCKET || SocketsToProcess[sockID].conn == -1){
+                    //TODO: Log this as an error, but continue in case the socket being invalid was a 1 time thing
+                    printf("We have an invalid socket for some reason. SocketID: %d\n", sockID);
+                    continue;
+                }
+
+                printf("\n\n#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$\n\n");
+                printf("Connected to %s:%d\n", inet_ntoa(SocketsToProcess[sockID].client_addr.sin_addr), htons(SocketsToProcess[sockID].client_addr.sin_port));
+
+                REQUEST *request = GetRequest(SocketsToProcess[sockID].conn);
+                printf("Client requested %d %s\n", request->type, request->value);
+
+                if (request->length == 0)
+                {
+                    printf("Request length 0\n");
+                    FreeRequest(request);
+
+                    continue;
+                }
+
+                RESPONSE *response = GetResponse(request);
+                int sent = SendResponse(SocketsToProcess[sockID].conn, response);
+
+                printf("response sent\n");
+
+                if (sent == 0)
+                {
+                    globalErrorCon = ERRCON_TERMINATE_SERVER;
+                }
+                else if (sent == -1)
+                {
+                    globalErrorCon = ERRCON_RESET_LISTENER;
+                }
+
+                closesocket(SocketsToProcess[sockID].conn);
+                FreeRequest(request);
+            }
+        }
+    }
+}
 
 int main(int argc, char **argv)
 {
     int addr_len;
     struct sockaddr_in local, client_addr;
 
-    SOCKET sock, msg_sock;
+    SOCKET sock;
     WSADATA wsaData;
 
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) == SOCKET_ERROR)
         error_die("WSAStartup()");
+
+    
 
     // Fill in the address structure
     local.sin_family        = AF_INET;
@@ -35,39 +84,30 @@ listen_goto:
 
     printf("Waiting for connection...\n");
 
+    int bsArgumentToPass = 0;
+    HANDLE unusedHandle = CreateThread(NULL, 0, processNextSocketInQueue, &bsArgumentToPass, 0, NULL );
+    HANDLE unusedHandle2 = CreateThread(NULL, 0, processNextSocketInQueue, &bsArgumentToPass, 0, NULL);
+    HANDLE unusedHandle3 = CreateThread(NULL, 0, processNextSocketInQueue, &bsArgumentToPass, 0, NULL);
+    HANDLE unusedHandle4 = CreateThread(NULL, 0, processNextSocketInQueue, &bsArgumentToPass, 0, NULL);
+
     int count = 0;
 
     forever
     {
         addr_len = sizeof(client_addr);
-        msg_sock = accept(sock, (struct sockaddr*)&client_addr, &addr_len);
+        SocketsToProcess[nextSocketToWrite].conn = accept(sock, (struct sockaddr*)&client_addr, &addr_len);
+        SocketsToProcess[nextSocketToWrite].client_addr = client_addr;
+        SocketsToProcess[nextSocketToWrite].address_length = addr_len;
+        while((nextSocketToWrite + 1) % MAX_SOCKETS == nextSocketToRead); //spin until read cursor moves to the next
+        nextSocketToWrite = ((nextSocketToWrite + 1) % MAX_SOCKETS);        
 
-        if (msg_sock == INVALID_SOCKET || msg_sock == -1)
-            error_die("accept()");
-
-        printf("\n\n#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$ %d\n\n", ++count);
-        printf("Connected to %s:%d\n", inet_ntoa(client_addr.sin_addr), htons(client_addr.sin_port));
-
-        REQUEST *request = GetRequest(msg_sock);
-        printf("Client requested %d %s\n", request->type, request->value);
-
-        if (request->length == 0){
-            FreeRequest(request);
-            continue;
-        }
-
-        RESPONSE *response = GetResponse(request);
-        int sent = SendResponse(msg_sock, response);
-
-        closesocket(msg_sock);
-        FreeRequest(request);
-
-        if (sent == 0)
+        if (globalErrorCon == ERRCON_TERMINATE_SERVER)
             break;
-        else if (sent == -1)
+        else if (globalErrorCon == ERRCON_RESET_LISTENER)
             goto listen_goto;
 
     }
 
     WSACleanup();
 }
+
