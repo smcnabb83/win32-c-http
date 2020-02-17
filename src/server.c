@@ -86,19 +86,13 @@ listen_goto:
     if (listen(sock, 5) == SOCKET_ERROR)
         error_die("listen()");
 
-    DEBUGPRINT("Sockets to process currentl takes %ld bytes of memory\n", (long)sizeof(ringBuffer.SocketBuffer));
-
     DEBUGPRINT("Waiting for connection...\n");
 
     HANDLE *threads = malloc(sizeof(HANDLE)*threadsToUse);
-
-    HANDLE *currentThread = threads;
-    //TODO: Do we really need bsArgumentToPass
     RING_BUFFER* ringBufferPointer = &ringBuffer;
     for(int i = 0; i < threadsToUse; i++){
         DEBUGPRINT("allocating thread %d of %d\n", i, threadsToUse);
-        *currentThread = CreateThread(NULL, 0, processNextSocketInQueue, &ringBuffer, 0, NULL);
-        currentThread++;
+        threads[i] = CreateThread(NULL, 0, processNextSocketInQueue, &ringBuffer, 0, NULL);
     }
     int count = 0;
 
@@ -108,8 +102,7 @@ listen_goto:
         ringBuffer.SocketBuffer[ringBuffer.nextSocketToWrite].conn = accept(sock, (struct sockaddr*)&client_addr, &addr_len);
         ringBuffer.SocketBuffer[ringBuffer.nextSocketToWrite].client_addr = client_addr;
         ringBuffer.SocketBuffer[ringBuffer.nextSocketToWrite].address_length = addr_len;
-        while ((ringBuffer.nextSocketToWrite + 1) % MAX_SOCKETS == ringBuffer.nextSocketToRead)
-            ; //spin until read cursor moves to the next
+        while (!RingBufferCanWrite(&ringBuffer)); //spin until read cursor moves to the next
         ringBuffer.nextSocketToWrite = ((ringBuffer.nextSocketToWrite + 1) % MAX_SOCKETS);
         ReleaseSemaphore(ringBuffer.RingBufferSemaphore, 1, 0);
 

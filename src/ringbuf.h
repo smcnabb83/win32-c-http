@@ -24,3 +24,4 @@ typedef struct{
 } RING_BUFFER;
 
 RING_BUFFER GetNewRingBuffer(int ThreadCount);
+BOOL RingBufferCanWrite(RING_BUFFER* buffer);

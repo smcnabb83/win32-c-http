@@ -8,3 +8,8 @@ RING_BUFFER GetNewRingBuffer(int threadCount){
   buffer.nextSocketToWrite = 0;
   return buffer;
 }
+
+BOOL RingBufferCanWrite(RING_BUFFER *buffer){
+  BOOL ret = (buffer->nextSocketToWrite + 1) % MAX_SOCKETS != buffer->nextSocketToRead;
+  return ret;
+}
