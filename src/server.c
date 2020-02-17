@@ -6,7 +6,6 @@
 DWORD WINAPI processNextSocketInQueue(LPVOID args)
 {
     RING_BUFFER* ringBuffer = (RING_BUFFER *)args;
-    //TODO: Right now, we're spinning forever. Maybe we can clean this up so we're not spinning multiple threads forever. 
     forever
     {
         int sockID = ringBuffer->nextSocketToRead;
@@ -20,12 +19,7 @@ DWORD WINAPI processNextSocketInQueue(LPVOID args)
                     continue;
                 }
 
-                DEBUGPRINT("\n\n#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$#$\n\n");
-                DEBUGPRINT("Connected to %s:%d\n", inet_ntoa(ringBuffer->SocketBuffer[sockID].client_addr.sin_addr), htons(ringBuffer->SocketBuffer[sockID].client_addr.sin_port));
-
                 REQUEST *request = GetRequest(ringBuffer->SocketBuffer[sockID].conn);
-                DEBUGPRINT("Client requested %d %s\n", request->type, request->value);
-
                 if (request->length == 0)
                 {
                     DEBUGPRINT("Request length 0\n");
@@ -37,7 +31,6 @@ DWORD WINAPI processNextSocketInQueue(LPVOID args)
                 RESPONSE *response = GetResponse(request);
                 int sent = SendResponse(ringBuffer->SocketBuffer[sockID].conn, response);
 
-                DEBUGPRINT("response sent\n");
 
                 if (sent == 0)
                 {
