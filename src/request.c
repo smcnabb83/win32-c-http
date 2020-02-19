@@ -1,6 +1,7 @@
 #include <winsock2.h>
 #include <stdio.h>
 #include "server.h"
+#include "globals.h"
 
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 
@@ -25,6 +26,7 @@ char *get_request_value(char *buf)
 
     sscanf(buf, "%s %s ", &retval, &retval);  // tee hee
 
+    //TODO: Do we automatically want to assume that all requests to the base go to index.html?
     if (retval[strlen(retval)-1] == '/')
         strcat(retval, "index.html");
 
@@ -67,8 +69,6 @@ REQUEST *GetRequest(SOCKET sock)
 
     msg_len = recv(sock, buf, sizeof(buf), 0);
     char* cookie = get_request_cookie(buf, msg_len);
-    printf("Bytes Received: %d, message: %s\n", msg_len, buf);
-    printf("Request cookie %s", cookie);
 
     request         = malloc(sizeof(REQUEST));
     request->type   = get_request_type(buf);

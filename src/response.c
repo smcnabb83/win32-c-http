@@ -61,14 +61,12 @@ int SendResponse(SOCKET sock, RESPONSE *response)
 
         if (msg_len == SOCKET_ERROR) {
             //error_live("send()");
-            printf("Error sending data, reconnecting...\n");
             closesocket(sock);
             fclose(f);
             return -1;
         }
         else if (!msg_len)
         {
-            printf("Client closed connection\n");
             closesocket(sock);
             fclose(f);
             return 0;
@@ -76,7 +74,6 @@ int SendResponse(SOCKET sock, RESPONSE *response)
         }
     }
 
-    printf("Served file %s\n", response->filepath);
     fclose(f);
 
     return 1;
