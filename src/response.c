@@ -36,11 +36,29 @@ RESPONSE *GetResponse(REQUEST *request)
     return response;
 }
 
+int ProcessFileRequest(SOCKET sock, REQUEST *req){
+    RESPONSE *resp = GetResponse(req);
+    return SendResponse(sock, resp);
+}
+
+int Send404Error(SOCKET sock){
+    send(sock, DEFAULT_ERROR_404, (int)strlen(DEFAULT_ERROR_404), 0);
+    return 1;
+}
+
+int SendDateResponse(SOCKET sock, REQUEST *req){
+    SYSTEMTIME time;
+    GetSystemTime(&time);
+    char buffer[250];
+    memset(buffer,'\0',250);
+    int size = sprintf(buffer, "HTTP/1.1 200 OK\r\nContent-Type: application/json ; charset=UTF-8\r\n\r\n{date: \"%d\\%d\\%d\"};\0", time.wMonth, time.wDay, time.wYear);
+    return send(sock, buffer, size, 0);    
+}
+
 int SendResponse(SOCKET sock, RESPONSE *response)
 {
     if (response->error) {
-        send(sock, DEFAULT_ERROR_404, (int)strlen(DEFAULT_ERROR_404), 0);
-        return 1;
+        Send404Error(sock);
     }
 
     FILE *f = fopen(response->filepath, "rb");

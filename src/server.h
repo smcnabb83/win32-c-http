@@ -22,7 +22,7 @@ typedef struct {
     int  error;
 } RESPONSE;
 
-typedef RESPONSE *(*route_function)(REQUEST *);
+typedef int (*route_function)(SOCKET, REQUEST*);
 
 typedef struct {
     char *route;
@@ -52,7 +52,10 @@ extern REQUEST *GetRequest(SOCKET);
 extern void FreeRequest(REQUEST *);
 extern RESPONSE *GetResponse(REQUEST *);
 extern int SendResponse(SOCKET, RESPONSE *);
+extern int ProcessFileRequest(SOCKET, REQUEST*);
 extern void error_live(const char *);
 extern void error_die(const char *);
+extern int Send404Error(SOCKET);
+int SendDateResponse(SOCKET, REQUEST*);
 
 #endif

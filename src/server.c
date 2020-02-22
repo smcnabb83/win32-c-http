@@ -14,11 +14,15 @@ void add_route(SERVER_CONFIG* config, char* route_to_match, route_function funct
     (*current_route_info)->next = NULL;
 }
 
+//TODO: This doesn't actually work. For example, if we have a route '/date/', it will actually match anything that 
+//TODO: begins with a d, such as /default.html. Make this functional once we have an idea on how we want this to work
 route_function match_route(SERVER_CONFIG config, REQUEST* request){
     int matchScore = 0;
     route_function func = NULL;
     ROUTE_INFO* info = config.route_info_nodes;
+    DEBUGPRINT("Route Info at start %s\n", info->route);
     while(info){
+        DEBUGPRINT("Matching route %s with path %s --- ", info->route, request->value);
         char* reqIter = request->value;
         char* matchIter = info->route;
         int tempScore = 0;
@@ -29,27 +33,26 @@ route_function match_route(SERVER_CONFIG config, REQUEST* request){
                 matchIter++;
             }
             else {
-                if(tempScore > matchScore){
-                    matchScore = tempScore;
-                    func = info->function;
-
-                }
                 break;
             }
         }
+        if (tempScore > matchScore)
+        {
+            matchScore = tempScore;
+            func = info->function;
+        }
+        DEBUGPRINT("Route matched with a score of %d, max score of %d\n", tempScore, matchScore);
         info = (ROUTE_INFO *)info->next;
     }
-    return config.route_info_nodes->function;
+    return func;
 }
 
-RESPONSE* route_request(SERVER_CONFIG config, REQUEST* request){
+int route_request(SERVER_CONFIG config, SOCKET sock, REQUEST* request){
     route_function function = match_route(config, request);
     if(function == NULL){
-        RESPONSE* errResp = malloc(sizeof(RESPONSE));
-        errResp->error = 1;
-        return errResp;
+        return Send404Error(sock);
     }
-    return function(request);
+    return function(sock, request);
 }
 
 DWORD WINAPI processNextSocketInQueue(LPVOID args)
@@ -78,9 +81,8 @@ DWORD WINAPI processNextSocketInQueue(LPVOID args)
 
                     continue;
                 }
-                RESPONSE *response = route_request(*config, request);
+                int sent = route_request(*config, ringBuffer->SocketBuffer[sockID].conn, request);
                 //RESPONSE *response = GetResponse(request);
-                int sent = SendResponse(ringBuffer->SocketBuffer[sockID].conn, response);
 
 
                 if (sent == 0)
@@ -188,7 +190,8 @@ listen_goto:
 int main(int argc, char **argv)
 {
     SERVER_CONFIG config = create_server_config();
-    add_route(&config, "/", &GetResponse);
+    add_route(&config, "/", &ProcessFileRequest);
+    add_route(&config, "/date/", &SendDateResponse);
     serve(config);
     return 0;   
 }
