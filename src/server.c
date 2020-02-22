@@ -3,22 +3,31 @@
 #include "ringbuf.h"
 #include "globals.h"
 
-void add_route(SERVER_CONFIG config, char* route_to_match, route_function function){
-    //TODO: actually implement this!
+void add_route(SERVER_CONFIG* config, char* route_to_match, route_function function){
+    ROUTE_INFO** current_route_info = &config->route_info_nodes;
+    while(*current_route_info){
+        current_route_info = (ROUTE_INFO**) &((*current_route_info)->next);
+    }
+    (*current_route_info) = (ROUTE_INFO*)malloc(sizeof(ROUTE_INFO));
+    (*current_route_info)->route = route_to_match;
+    (*current_route_info)->function = function;
+    (*current_route_info)->next = NULL;
 }
 
-route_function match_route(REQUEST* request){
-    return (route_function)GetResponse;
+route_function match_route(SERVER_CONFIG config, REQUEST* request){
+    //TODO: make this actually match a route
+    return config.route_info_nodes->function;
 }
 
-RESPONSE* route_request(REQUEST* request){
-    route_function function = match_route(request);
+RESPONSE* route_request(SERVER_CONFIG config, REQUEST* request){
+    route_function function = match_route(config, request);
     return function(request);
 }
 
 DWORD WINAPI processNextSocketInQueue(LPVOID args)
 {
-    RING_BUFFER* ringBuffer = (RING_BUFFER *)args;
+    SERVER_CONFIG* config = (SERVER_CONFIG*) args;
+    RING_BUFFER* ringBuffer = &config->ringBuffer;
     forever
     {
         int sockID = ringBuffer->nextSocketToRead;
@@ -41,7 +50,7 @@ DWORD WINAPI processNextSocketInQueue(LPVOID args)
 
                     continue;
                 }
-                RESPONSE *response = route_request(request);
+                RESPONSE *response = route_request(*config, request);
                 //RESPONSE *response = GetResponse(request);
                 int sent = SendResponse(ringBuffer->SocketBuffer[sockID].conn, response);
 
@@ -88,7 +97,8 @@ int serve(SERVER_CONFIG config){
     GetSystemInfo(&info);
     int threadsToUse = ((int)info.dwNumberOfProcessors) - 1;
 
-    RING_BUFFER ringBuffer = GetNewRingBuffer(threadsToUse);
+    ConfigRingBuffer(threadsToUse, &config.ringBuffer);
+    RING_BUFFER* ringBuffer = &config.ringBuffer;
 
     struct sockaddr_in local, client_addr;
 
@@ -113,11 +123,11 @@ int serve(SERVER_CONFIG config){
         error_die("bind()");
 
     HANDLE *threads = malloc(sizeof(HANDLE) * threadsToUse);
-    RING_BUFFER *ringBufferPointer = &ringBuffer;
+    RING_BUFFER *ringBufferPointer = ringBuffer;
     for (int i = 0; i < threadsToUse; i++)
     {
         DEBUGPRINT("allocating thread %d of %d\n", i, threadsToUse);
-        threads[i] = CreateThread(NULL, 0, processNextSocketInQueue, &ringBuffer, 0, NULL);
+        threads[i] = CreateThread(NULL, 0, processNextSocketInQueue, &config, 0, NULL);
     }
     int count = 0;
 
@@ -131,14 +141,14 @@ listen_goto:
     //Start our message loop
     forever
     {
-        PutNextMessageInQueue(&ringBuffer, sock, &client_addr);
-        while (!RingBufferCanWrite(&ringBuffer)); //spin until read cursor moves to the next
-        ringBuffer.nextSocketToWrite = ((ringBuffer.nextSocketToWrite + 1) % MAX_SOCKETS);
-        ReleaseSemaphore(ringBuffer.RingBufferSemaphore, 1, 0);
+        PutNextMessageInQueue(ringBuffer, sock, &client_addr);
+        while (!RingBufferCanWrite(ringBuffer)); //spin until read cursor moves to the next
+        ringBuffer->nextSocketToWrite = ((ringBuffer->nextSocketToWrite + 1) % MAX_SOCKETS);
+        ReleaseSemaphore(ringBuffer->RingBufferSemaphore, 1, 0);
 
-        if (ringBuffer.bufferErrorCon == ERRCON_TERMINATE_SERVER)
+        if (ringBuffer->bufferErrorCon == ERRCON_TERMINATE_SERVER)
             break;
-        else if (ringBuffer.bufferErrorCon == ERRCON_RESET_LISTENER)
+        else if (ringBuffer->bufferErrorCon == ERRCON_RESET_LISTENER)
             goto listen_goto;
     }
 
@@ -150,7 +160,7 @@ listen_goto:
 int main(int argc, char **argv)
 {
     SERVER_CONFIG config = create_server_config();
-    add_route(config, "/", &GetResponse);
+    add_route(&config, "/", &GetResponse);
     serve(config);
     return 0;   
 }

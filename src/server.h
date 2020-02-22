@@ -5,13 +5,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "ringbuf.h"
 
 #define forever while(1)
-
-
-typedef struct {
-    u_short port;
-} SERVER_CONFIG;
 
 typedef struct {
     int  type;
@@ -26,7 +22,21 @@ typedef struct {
     int  error;
 } RESPONSE;
 
-typedef RESPONSE* (*route_function)(REQUEST*);
+typedef RESPONSE *(*route_function)(REQUEST *);
+
+typedef struct {
+    char *route;
+    route_function function;
+    struct ROUTE_INFO* next;
+} ROUTE_INFO;
+
+
+typedef struct
+{
+    u_short port;
+    ROUTE_INFO* route_info_nodes;
+    RING_BUFFER ringBuffer;
+} SERVER_CONFIG;
 
 #define REQUEST_SIZE 4096
 #define DEFAULT_PORT 80

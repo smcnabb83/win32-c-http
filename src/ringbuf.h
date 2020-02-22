@@ -1,3 +1,5 @@
+#ifndef WIN32_C_HTTP_RINGBUF_H
+#define WIN32_C_HTTP_RINGBUF_H
 #include<winsock2.h>
 
 enum ErrorCondition
@@ -24,4 +26,7 @@ typedef struct{
 } RING_BUFFER;
 
 RING_BUFFER GetNewRingBuffer(int ThreadCount);
+void ConfigRingBuffer(int ThreadCount, RING_BUFFER* buffer);
 BOOL RingBufferCanWrite(RING_BUFFER* buffer);
+
+#endif
