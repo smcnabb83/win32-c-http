@@ -24,11 +24,7 @@ char *get_request_value(char *buf)
 {
     char retval[100] = {0};
 
-    sscanf(buf, "%s %s ", &retval, &retval);  // tee hee
-
-    //TODO: Do we automatically want to assume that all requests to the base go to index.html?
-    if (retval[strlen(retval)-1] == '/')
-        strcat(retval, "index.html");
+    sscanf(buf, "%s %s ", &retval, &retval);  
 
     return strdup(retval);
 }

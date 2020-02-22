@@ -15,12 +15,40 @@ void add_route(SERVER_CONFIG* config, char* route_to_match, route_function funct
 }
 
 route_function match_route(SERVER_CONFIG config, REQUEST* request){
-    //TODO: make this actually match a route
+    int matchScore = 0;
+    route_function func = NULL;
+    ROUTE_INFO* info = config.route_info_nodes;
+    while(info){
+        char* reqIter = request->value;
+        char* matchIter = info->route;
+        int tempScore = 0;
+        while(*reqIter != '\0' && *matchIter != '\0'){
+            if(*reqIter == *matchIter){
+                tempScore++;
+                reqIter++;
+                matchIter++;
+            }
+            else {
+                if(tempScore > matchScore){
+                    matchScore = tempScore;
+                    func = info->function;
+
+                }
+                break;
+            }
+        }
+        info = (ROUTE_INFO *)info->next;
+    }
     return config.route_info_nodes->function;
 }
 
 RESPONSE* route_request(SERVER_CONFIG config, REQUEST* request){
     route_function function = match_route(config, request);
+    if(function == NULL){
+        RESPONSE* errResp = malloc(sizeof(RESPONSE));
+        errResp->error = 1;
+        return errResp;
+    }
     return function(request);
 }
 
