@@ -11,7 +11,7 @@ enum ErrorCondition
 typedef struct
 {
   SOCKET conn;
-  struct sockaddr_in client_addr;
+  SOCKADDR_IN client_addr;
   int address_length;
 } SOCKET_INFO;
 

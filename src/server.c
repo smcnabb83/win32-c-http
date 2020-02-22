@@ -3,6 +3,19 @@
 #include "ringbuf.h"
 #include "globals.h"
 
+void add_route(SERVER_CONFIG config, char* route_to_match, route_function function){
+    //TODO: actually implement this!
+}
+
+route_function match_route(REQUEST* request){
+    return (route_function)GetResponse;
+}
+
+RESPONSE* route_request(REQUEST* request){
+    route_function function = match_route(request);
+    return function(request);
+}
+
 DWORD WINAPI processNextSocketInQueue(LPVOID args)
 {
     RING_BUFFER* ringBuffer = (RING_BUFFER *)args;
@@ -13,10 +26,11 @@ DWORD WINAPI processNextSocketInQueue(LPVOID args)
         {
             if (sockID == InterlockedCompareExchange(&ringBuffer->nextSocketToRead, ((sockID + 1) % MAX_SOCKETS), sockID))
             {
+                DEBUGPRINT("socket buffer info: %d\n ", (int)ringBuffer->SocketBuffer[sockID].conn);
                 if (ringBuffer->SocketBuffer[sockID].conn == INVALID_SOCKET || ringBuffer->SocketBuffer[sockID].conn == -1){
                     //TODO: Log this as an error, but continue in case the socket being invalid was a 1 time thing
                     DEBUGPRINT("We have an invalid socket for some reason. SocketID: %d\n", sockID);
-                    continue;
+                    break;
                 }
 
                 REQUEST *request = GetRequest(ringBuffer->SocketBuffer[sockID].conn);
@@ -27,8 +41,8 @@ DWORD WINAPI processNextSocketInQueue(LPVOID args)
 
                     continue;
                 }
-
-                RESPONSE *response = GetResponse(request);
+                RESPONSE *response = route_request(request);
+                //RESPONSE *response = GetResponse(request);
                 int sent = SendResponse(ringBuffer->SocketBuffer[sockID].conn, response);
 
 
@@ -48,17 +62,27 @@ DWORD WINAPI processNextSocketInQueue(LPVOID args)
             WaitForSingleObjectEx(ringBuffer->RingBufferSemaphore, INFINITE, FALSE);
         }
     }
+    return (DWORD) 1;
 }
 
-void PutNextMessageInQueue(RING_BUFFER* ringBuffer, SOCKET sock, struct sockaddr_in* client_addr){
-    SOCKET ret;
-    int addr_len = sizeof(client_addr);
-    ringBuffer->SocketBuffer[ringBuffer->nextSocketToWrite].conn = accept(sock, (struct sockaddr *)&client_addr, &addr_len);
+void PutNextMessageInQueue(RING_BUFFER* ringBuffer, SOCKET sock, SOCKADDR_IN* client_addr){
+    int addr_len = sizeof(*client_addr);
     ringBuffer->SocketBuffer[ringBuffer->nextSocketToWrite].client_addr = *client_addr;
     ringBuffer->SocketBuffer[ringBuffer->nextSocketToWrite].address_length = addr_len;
+    ringBuffer->SocketBuffer[ringBuffer->nextSocketToWrite].conn = accept(sock, (SOCKADDR *)&client_addr, &addr_len);
+    if(ringBuffer->SocketBuffer[ringBuffer->nextSocketToWrite].conn == INVALID_SOCKET){
+        DEBUGPRINT("Socket accept failed for queue slot %d, with an error code of %d\n", ringBuffer->nextSocketToWrite, WSAGetLastError());
+        
+    }
 }
 
-int serve(){
+SERVER_CONFIG create_server_config(){
+    SERVER_CONFIG config;
+    config.port = 80;
+    return config;
+}
+
+int serve(SERVER_CONFIG config){
     //Initialization
     SYSTEM_INFO info;
     GetSystemInfo(&info);
@@ -66,7 +90,6 @@ int serve(){
 
     RING_BUFFER ringBuffer = GetNewRingBuffer(threadsToUse);
 
-    int addr_len;
     struct sockaddr_in local, client_addr;
 
     SOCKET sock;
@@ -78,6 +101,7 @@ int serve(){
     // Fill in the address structure
     local.sin_family = AF_INET;
     local.sin_addr.s_addr = INADDR_ANY;
+    DEBUGPRINT("port configured: %d", config.port);
     local.sin_port = htons(DEFAULT_PORT);
 
     sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -118,13 +142,16 @@ listen_goto:
             goto listen_goto;
     }
 
+    free(threads);
     WSACleanup();
+    return 0;
 }
 
 int main(int argc, char **argv)
 {
-    serve();
-    return 0;
-   
+    SERVER_CONFIG config = create_server_config();
+    add_route(config, "/", &GetResponse);
+    serve(config);
+    return 0;   
 }
 

@@ -9,6 +9,9 @@
 #define forever while(1)
 
 
+typedef struct {
+    u_short port;
+} SERVER_CONFIG;
 
 typedef struct {
     int  type;
@@ -23,6 +26,7 @@ typedef struct {
     int  error;
 } RESPONSE;
 
+typedef RESPONSE* (*route_function)(REQUEST*);
 
 #define REQUEST_SIZE 4096
 #define DEFAULT_PORT 80
