@@ -49,9 +49,8 @@ int Send404Error(SOCKET sock){
 int SendDateResponse(SOCKET sock, REQUEST *req){
     SYSTEMTIME time;
     GetSystemTime(&time);
-    char buffer[250];
-    memset(buffer,'\0',250);
-    int size = sprintf(buffer, "HTTP/1.1 200 OK\r\nContent-Type: application/json ; charset=UTF-8\r\n\r\n{date: \"%d\\%d\\%d\"};\0", time.wMonth, time.wDay, time.wYear);
+    char buffer[1000] = {0};
+    int size = sprintf(buffer, "%s{date: \"%d\\%d\\%d\"};\0", GenerateHeader(TYPE_JSON), time.wMonth, time.wDay, time.wYear);
     return send(sock, buffer, size, 0);    
 }
 

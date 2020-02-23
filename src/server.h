@@ -44,6 +44,16 @@ typedef struct
 #undef DELETE
 enum { RQ_UNDEF,GET,POST,PUT } response_types;
 
+typedef enum header_types 
+{
+    TYPE_HTML,
+    TYPE_CSS, 
+    TYPE_JAVASCRIPT, 
+    TYPE_JSON,
+    TYPE_JPEG,
+    TYPE_ICON
+} header_types;
+
 extern const char *DEFAULT_ERROR_404;
 
 extern char *getcwd(char *, unsigned int);
@@ -57,5 +67,6 @@ extern void error_live(const char *);
 extern void error_die(const char *);
 extern int Send404Error(SOCKET);
 int SendDateResponse(SOCKET, REQUEST*);
+extern char *GenerateHeader(header_types);
 
 #endif
