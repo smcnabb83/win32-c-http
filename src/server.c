@@ -14,8 +14,30 @@ void add_route(SERVER_CONFIG* config, char* route_to_match, route_function funct
     (*current_route_info)->next = NULL;
 }
 
-//TODO: This doesn't actually work. For example, if we have a route '/date/', it will actually match anything that 
-//TODO: begins with a d, such as /default.html. Make this functional once we have an idea on how we want this to work
+//matches parts of routes that are between \ and 
+//TODO: This doesn't work quite right - fix. 
+BOOL match_chunk(char* left, char* right, int* advanceCount){
+    BOOL matched = FALSE;
+    while(matched == FALSE && *left != '\0' && *right != '\0'){
+        if(*left != *right){
+            break;
+        }
+        if(*left == '/' && *right == '/'){
+            matched = TRUE;
+        }
+        left++;
+        right++;
+        (*advanceCount)++;
+    }
+
+    if(*left == *right){
+        matched = TRUE;
+    }
+
+    return matched;
+}
+
+//TODO: This is still fragile & finicky - need to make this more robust later.
 route_function match_route(SERVER_CONFIG config, REQUEST* request){
     int matchScore = 0;
     route_function func = NULL;
@@ -26,22 +48,34 @@ route_function match_route(SERVER_CONFIG config, REQUEST* request){
         char* reqIter = request->value;
         char* matchIter = info->route;
         int tempScore = 0;
-        while(*reqIter != '\0' && *matchIter != '\0'){
-            if(*reqIter == *matchIter){
+        BOOL match = FALSE;
+        //TODO: using advanceCount seems kinda janky - is there a better way to do this?
+        int advanceCount = 0;
+        while(match_chunk(reqIter, matchIter, &advanceCount)){
+            tempScore++;
+            reqIter += advanceCount;
+            matchIter += advanceCount;
+            advanceCount = 0;
+        }
+
+        if(*matchIter == '*' || (*matchIter == *reqIter)){
+            match = TRUE;
+            if(*matchIter == *reqIter){
                 tempScore++;
-                reqIter++;
-                matchIter++;
-            }
-            else {
-                break;
             }
         }
-        if (tempScore > matchScore)
+
+        if (match && tempScore > matchScore)
         {
             matchScore = tempScore;
             func = info->function;
         }
-        DEBUGPRINT("Route matched with a score of %d, max score of %d\n", tempScore, matchScore);
+        if(match){
+            DEBUGPRINT("Route matched with a score of %d, max score of %d\n", tempScore, matchScore);
+        }
+        else {
+            DEBUGPRINT("Route did not match");
+        }
         info = (ROUTE_INFO *)info->next;
     }
     return func;
@@ -187,12 +221,14 @@ listen_goto:
     return 0;
 }
 
+#ifndef WIN32_C_HTTP_TEST_BUILD
 int main(int argc, char **argv)
 {
     SERVER_CONFIG config = create_server_config();
-    add_route(&config, "/", &ProcessFileRequest);
+    add_route(&config, "/*", &ProcessFileRequest);
     add_route(&config, "/date/", &SendDateResponse);
     serve(config);
     return 0;   
 }
+#endif
 

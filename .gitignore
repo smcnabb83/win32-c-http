@@ -5,6 +5,7 @@
 *.out
 *.bin
 *.obj
+*.pdb
+*.rdbg
 
-src/win32server.rdbg
 /build
